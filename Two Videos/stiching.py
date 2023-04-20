@@ -3,7 +3,6 @@ import numpy as np
 def main():
     left = cv2.VideoCapture("vid1.mp4")
     middle = cv2.VideoCapture("vid2.mp4")
-    right = cv2.VideoWriter_fourcc("vid3.mp4")
     # left = cv2.VideoCapture(2);
     # middle = cv2.VideoCapture(4);
     print(middle.isOpened())
