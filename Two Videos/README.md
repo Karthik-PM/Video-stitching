@@ -1,4 +1,4 @@
-# Video-stitching
+# Two video stitching
 Input videos:
 ![image](https://user-images.githubusercontent.com/72903849/233339466-9bdb0421-0ee4-42bf-82af-d9d09c4bef10.png)
 
