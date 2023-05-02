@@ -5,12 +5,14 @@ def main():
     middle = cv2.VideoCapture("vid2.mp4")
     # left = cv2.VideoCapture(2);
     # middle = cv2.VideoCapture(4);
-    print(middle.isOpened())
+    # print(middle.isOpened())
+    print(left.isOpened())
     sift = cv2.SIFT_create()
     bf = cv2.BFMatcher(cv2.NORM_L1, crossCheck=False)
     HomoGraphyFlag = True
     ExceptionFlag = True
     while(left.isOpened() and middle.isOpened()):
+        # print("hello")
         ret, framemiddle = middle.read()
         ret, frameLeft = left.read()
         frameLeftGray = cv2.cvtColor(frameLeft, cv2.COLOR_RGB2GRAY)
@@ -45,14 +47,15 @@ def main():
         TransformedFrameLeft = cv2.warpPerspective(frameLeft, H, (frameLeft.shape[1] + framemiddle.shape[1], framemiddle.shape[0]))
         cv2.imshow("good Matches", drawMatches)
         # cv2.cvtColor(cv2.cvtColor(framemiddle , cv2.COLOR_GRAY2RGB) , cv2.COLOR_RGB2GRAY)
-        TranformedFramemiddle = np.zeros([TransformedFrameLeft.shape[0], TransformedFrameLeft.shape[1] , 3], dtype = np.uint8)
-        TranformedFramemiddle[:framemiddle.shape[0],:framemiddle.shape[1]] = framemiddle
+        # TranformedFramemiddle = np.zeros([TransformedFrameLeft.shape[0], TransformedFrameLeft.shape[1] , 3], dtype = np.uint8)
+        TransformedFrameLeft[:framemiddle.shape[0],:framemiddle.shape[1]] = framemiddle
         # print(TranformedFramemiddle.shape ,":", TransformedFrameLeft.shape)
         # cv2.imshow("Transformedmiddle", TranformedFramemiddle)
         # cv2.imshow("Framemiddle" , framemiddle)
+        
         try:
-            sitchedImg = cv2.add(TransformedFrameLeft , TranformedFramemiddle)
-            cv2.imshow("panoramic image " , sitchedImg)
+            # sitchedImg = cv2.add(TransformedFrameLeft , TranformedFramemiddle)
+            cv2.imshow("panoramic image " , TransformedFrameLeft)
         except Exception as e:
             if(ExceptionFlag):
                 print(e)
