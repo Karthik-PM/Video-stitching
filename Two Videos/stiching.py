@@ -6,7 +6,8 @@ def main():
     # left = cv2.VideoCapture(2);
     # middle = cv2.VideoCapture(4);
     # print(middle.isOpened())
-    print(left.isOpened())
+    # print(left)
+    print(left.isOpened() , middle.isOpened())
     sift = cv2.SIFT_create()
     bf = cv2.BFMatcher(cv2.NORM_L1, crossCheck=False)
     HomoGraphyFlag = True
@@ -42,6 +43,7 @@ def main():
             image2_kp = np.float32([kp2[i].pt for (i, _) in good_points])
             if(HomoGraphyFlag):
                 H, status = cv2.findHomography(image2_kp, image1_kp, cv2.RANSAC, 5.0)
+                print(H)
                 HomoGraphyFlag = False
 
         TransformedFrameLeft = cv2.warpPerspective(frameLeft, H, (frameLeft.shape[1] + framemiddle.shape[1], framemiddle.shape[0]))
