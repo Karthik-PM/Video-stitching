@@ -17,41 +17,36 @@ int main(int argc, char const *argv[])
     cv::Mat keypoints2;
     cv::drawKeypoints(img1, kp1, keypoints1);
     cv::drawKeypoints(img2, kp2, keypoints2);
-    // cv::imshow("keypoints in img1", keypoints1);
+    cv::imshow("keypoints in img1", keypoints1);
     // cv::imshow("keypoints in img2", keypoints2);
-    cv::BFMatcher matcher;
+    cv::FlannBasedMatcher matcher;
     std::vector<std::vector<cv::DMatch>> matches;
     int k = 2;
     matcher.knnMatch(des1, des2, matches, k);
-
     double ratio = 0.7;
     std::vector<cv::DMatch> goodmatches;
+    std::vector<cv::Point2f> goodkp1, goodkp2;
     for(int i = 0; i < matches.size(); i++) {
         if(matches[i][0].distance < matches[i][1].distance * ratio) {
+            std::cout << matches[i][0].distance << " " << matches[i][1].distance << "\n";
             goodmatches.push_back(matches[i][0]);
+            goodkp1.push_back(kp1[matches[i][0].queryIdx].pt);
+            goodkp2.push_back(kp1[matches[i][0].trainIdx].pt);
         }
     }
-
-    cv::Mat MatchedImages;
-    cv::drawMatches(img1,kp1,img2,kp2,goodmatches,MatchedImages);
-    std::vector<cv::Point2f> goodkp1, goodkp2;
-    for(int i = 0; i < goodmatches.size(); i++){
-        goodkp1.push_back(kp1[goodmatches[i].queryIdx].pt);
-        goodkp2.push_back(kp1[goodmatches[i].trainIdx].pt);
-
-    }
-    
-    cv::imshow("Match", MatchedImages);
+    cv::Mat goodMatchesimg;
+    cv::drawMatches(img1, kp1, img2, kp2, goodmatches, goodMatchesimg);
+    cv::imshow("good matches", goodMatchesimg);
     cv::Mat Homography = cv::findHomography(goodkp1, goodkp2, cv::RANSAC);
     cv::Mat wrapImage;
     cv::warpPerspective(img2, wrapImage, Homography, img1.size());
     cv::Mat mask = cv::Mat::zeros(img1.size(), CV_8U);
     cv::rectangle(mask, cv::Rect(0, 0, img1.cols, img1.rows), cv::Scalar(255), cv::FILLED);
 
-    cv::Mat stichedImage;
-    img1.copyTo(stichedImage, mask);
-    wrapImage.copyTo(stichedImage, ~mask);
-    cv::imshow("Stitched image", stichedImage);
+    // cv::Mat stichedImage;
+    // img1.copyTo(stichedImage, mask);
+    // wrapImage.copyTo(stichedImage, ~mask);
+    cv::imshow("Stitched image", wrapImage);
     cv::waitKey(0);
     return 0;
 }
