@@ -4,8 +4,8 @@
 #include <opencv2/cudafeatures2d.hpp>
 
 int main() {
-    cv::Mat img1 = cv::imread("left.png");
-    cv::Mat img2 = cv::imread("right.png");
+    cv::Mat img1 = cv::imread("images/left.png");
+    cv::Mat img2 = cv::imread("images/right.png");
     cv::Mat img1_gray;
     cv::Mat img2_gray;
     cv::cvtColor(img1, img1_gray, cv::COLOR_BGR2GRAY);
@@ -46,8 +46,7 @@ int main() {
     // displaying the good keypoints and match
     cv::Mat matchedRes;
     cv::drawMatches(img1, kp1, img2, kp2, good_matches, matchedRes);
-    cv::imshow("matches", matchedRes);
-
+    cv::imwrite("good_matches.png", matchedRes);
 
     // storing the keypoints of the matches
     std::vector<cv::Point2f> good_kp1, good_kp2; 
@@ -58,18 +57,25 @@ int main() {
 
     // genrating homography
     cv::Mat TransformationMatrix = cv::findHomography(good_kp2, good_kp1, cv::RANSAC);
+
+    // performing the tranformaton in GPU
     cv::cuda::GpuMat TransormedFrameimg1_GPU;
     cv::cuda::warpPerspective(img2_gpu, TransormedFrameimg1_GPU, TransformationMatrix, img2.size() + img1.size());
     cv::Mat TransormedFrameimg2;
+    // extracting image from GPU to CPU
     TransormedFrameimg1_GPU.download(TransormedFrameimg2);
-    cv::imshow("tranformed image", TransormedFrameimg2);
+    cv::imwrite("tranformed_image2.png", TransormedFrameimg2);
+
+    //tranforming train image to a bigger mask of the tranformation matrix
     cv::Mat mask = cv::Mat::zeros(img1.size() + img2.size(), CV_8U);
     cv::Rect region_of_intrest(0,0, img1.cols, img1.rows);
     img1_gray.copyTo(mask(region_of_intrest));
     cv::Mat TranformedFrameimg1 = mask;
+    // perform image addition
     cv::Mat result;
     cv::add(TranformedFrameimg1, TransormedFrameimg2, result);
     cv::imshow("result", result);
+    cv::imwrite("result.png", result);
     cv::waitKey(0);
 
     return 0;
