@@ -1,6 +1,7 @@
 import cv2
 import numpy as np 
 import subprocess
+
 class VideoStiching:
     sift = cv2.SIFT_create()
     bf = cv2.BFMatcher(cv2.NORM_L1 , crossCheck = False)
