@@ -21,6 +21,7 @@ int main() {
     std::vector<cv::KeyPoint> kp2;
     cv::cuda::GpuMat des1_gpu;
     cv::cuda::GpuMat des2_gpu;
+
     orb_gpu->detectAndCompute(img1_gpu,cv::cuda::GpuMat(),kp1,des1_gpu);
     orb_gpu->detectAndCompute(img2_gpu, cv::cuda::GpuMat(), kp2, des2_gpu);
     cv::Mat img1_kps;
