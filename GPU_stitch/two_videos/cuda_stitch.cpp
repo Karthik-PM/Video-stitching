@@ -5,7 +5,7 @@
 #include <opencv2/opencv.hpp>
 int main(int argc, char const *argv[])
 {
-    cv::VideoCapture cap1(3);
+    cv::VideoCapture cap1(7);
     cv::VideoCapture cap2(5);
 
     cv::Mat Frame1;
