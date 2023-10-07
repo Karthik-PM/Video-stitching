@@ -17,6 +17,7 @@ int main() {
 
     // Download the image from GPU to CPU.
     cv::Ptr<cv::cuda::ORB> orb_gpu = cv::cuda::ORB::create(); 
+    // cv::Ptr<cv::cuda::SURF_CUDA> surf_cuda = cv::cuda::SURF_CUDA()::create();
     std::vector<cv::KeyPoint> kp1;
     std::vector<cv::KeyPoint> kp2;
     cv::cuda::GpuMat des1_gpu;
@@ -54,6 +55,7 @@ int main() {
     for(auto match : good_matches){
         good_kp1.push_back(kp1[match.queryIdx].pt);
         good_kp2.push_back(kp2[match.trainIdx].pt);
+        std::cout << kp1[match.queryIdx].pt << "\n";
     }
 
     // genrating homography
@@ -77,7 +79,7 @@ int main() {
     cv::add(TranformedFrameimg1, TransormedFrameimg2, result);
     cv::imshow("result", result);
     cv::imwrite("result.png", result);
-    cv::waitKey(0);
+    cv::waitKey(1000);
 
     return 0;
 }

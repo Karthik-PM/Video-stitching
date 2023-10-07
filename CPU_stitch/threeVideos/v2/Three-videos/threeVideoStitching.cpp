@@ -57,6 +57,10 @@ int main(int argc, char const *argv[])
         bool isFrame2Active = video2.read(Frame2);
         bool isFrame3Active = video3.read(Frame3);
 
+        cv::imwrite("output_images/input/img1.png", Frame1);
+        cv::imwrite("output_images/input/img2.png", Frame2);
+        cv::imwrite("output_images/input/img3.png", Frame3);
+
         // shifing the reference image to the center
 
         Frame2 = shiftImage(Frame2, 300, 300);

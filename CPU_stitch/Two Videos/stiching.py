@@ -1,8 +1,8 @@
 import cv2
 import numpy as np
 def main():
-    left = cv2.VideoCapture("vid1.mp4")
-    middle = cv2.VideoCapture("vid2.mp4")
+    left = cv2.VideoCapture(3)
+    middle = cv2.VideoCapture(5)
     # left = cv2.VideoCapture(2);
     # middle = cv2.VideoCapture(4);
     # print(middle.isOpened())
@@ -49,7 +49,8 @@ def main():
         TransformedFrameLeft = cv2.warpPerspective(frameLeft, H, (frameLeft.shape[1] + framemiddle.shape[1], framemiddle.shape[0]))
         cv2.imshow("good Matches", drawMatches)
         # cv2.cvtColor(cv2.cvtColor(framemiddle , cv2.COLOR_GRAY2RGB) , cv2.COLOR_RGB2GRAY)
-        # TranformedFramemiddle = np.zeros([TransformedFrameLeft.shape[0], TransformedFrameLeft.shape[1] , 3], dtype = np.uint8)
+        TranformedFramemiddle = np.zeros([TransformedFrameLeft.shape[0], TransformedFrameLeft.shape[1] , 3], dtype = np.uint8)
+        TranformedFramemiddle[:framemiddle.shape[0],:framemiddle.shape[1]] = framemiddle
         TransformedFrameLeft[:framemiddle.shape[0],:framemiddle.shape[1]] = framemiddle
         # print(TranformedFramemiddle.shape ,":", TransformedFrameLeft.shape)
         # cv2.imshow("Transformedmiddle", TranformedFramemiddle)
@@ -57,7 +58,9 @@ def main():
         
         try:
             # sitchedImg = cv2.add(TransformedFrameLeft , TranformedFramemiddle)
-            cv2.imshow("panoramic image " , TransformedFrameLeft)
+            cv2.imshow("Left" , TranformedFramemiddle)
+            # cv2.imshow("right" , TransformedFrameLeft)
+            # cv2.imshow("panoramic image " , sitchedImg)
         except Exception as e:
             if(ExceptionFlag):
                 print(e)
