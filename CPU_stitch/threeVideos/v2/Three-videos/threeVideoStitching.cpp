@@ -123,7 +123,7 @@ int main(int argc, char const *argv[])
         cv::drawMatches(Frame2, kp_vid2, Frame3, kp_vid3, goodMatches23, goodMatches23_display);
         cv::imwrite("output_images/matching/goodMatches21.png", goodMatches21_display);
         cv::imwrite("output_images/matching/goodMatches23.png", goodMatches23_display);
-
+        cv::imshow("matches 23", goodMatches21_display);
         std::vector<cv::Point2f> good_kp12, good_kp21, good_kp32, good_kp23;
         for(auto match23 : goodMatches23){
             good_kp32.push_back(kp_vid2[match23.queryIdx].pt);
