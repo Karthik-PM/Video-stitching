@@ -52,6 +52,7 @@ int main(int argc, char const *argv[])
     bool isHomographyComputed21 = false;
     bool isHomographyComputed23 = false;
     bool isShifted = false;
+    int prev_frame_time = 0;
     while(video1.isOpened() && video2.isOpened() && video3.isOpened()){
         bool isFrame1Active = video1.read(Frame1);
         bool isFrame2Active = video2.read(Frame2);
@@ -172,12 +173,14 @@ int main(int argc, char const *argv[])
         // panormoic result
 
         cv::Mat temp_res, result;
-        if(Tranformation21.size() == Frame2.size() && Frame2.size() == Tranformation23.size()){
-            cv::add(Tranformation21, Frame2, temp_res);
-            cv::add(temp_res, Tranformation23, result);
-            cv::imshow("result", result);
-            cv::imwrite("result.png", result);
-        }
+        std::cout << "hello\n";
+        cv::add(Tranformation21, Frame2, temp_res);
+        cv::add(temp_res, Tranformation23, result);
+        cv::imshow("result", result);
+        cv::imwrite("result.png", result);
+        cv::putText(result, "FPS: " + std::to_string(static_cast<int>(1.0 / (cv::getTickCount() - prev_frame_time) * cv::getTickFrequency())), cv::Point(7, 70), cv::FONT_HERSHEY_SIMPLEX, 3, cv::Scalar(100, 255, 0), 3, cv::LINE_AA);
+        prev_frame_time = cv::getTickCount();
+
         int key = cv::waitKey(100);
         if (key == 'q' || key == 27) {  // 'q' key or Esc key (27) to exit
             break;
