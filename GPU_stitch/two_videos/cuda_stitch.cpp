@@ -53,7 +53,10 @@ int main(int argc, char const *argv[])
         matcher->match(des1_gpu, des2_gpu, knn_matches);
 
         // soting the best points (as lowes ratios test dosent seem to work for this!)
-        std::sort(knn_matches.begin(), knn_matches.end());
+        std::sort(knn_matches.begin(), knn_matches.end(), [](const cv::DMatch& a, const cv::DMatch& b){
+                    return a.distance < b.distance;
+        });
+
         int number_of_matches = 50;
         std::vector good_matches(knn_matches.begin(), knn_matches.begin() + number_of_matches);
 
@@ -91,7 +94,9 @@ int main(int argc, char const *argv[])
         Frame1.copyTo(mask(region_of_intrest));
         cv::Mat TranformedFrameFrame1 = mask;
         cv::imshow("Frame1", mask);
-//        perform image addition
+
+        //perform image addition
+
         cv::Mat result;
         cv::add(TranformedFrameFrame1, TransormedFrameFrame2, result);
         cv::imshow("result", result);

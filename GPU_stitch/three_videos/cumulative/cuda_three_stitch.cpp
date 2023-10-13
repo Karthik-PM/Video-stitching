@@ -2,7 +2,6 @@
 #include <opencv2/cudawarping.hpp>
 #include <opencv2/cudaimgproc.hpp>
 #include <opencv2/cudafeatures2d.hpp>
-#include <opencv2/core/cuda.hpp>
 
 // global declarations
 cv::Ptr<cv::cuda::ORB> orb_gpu = cv::cuda::ORB::create();
@@ -24,27 +23,18 @@ cv::cuda::GpuMat genrateDescriptors(cv::cuda::GpuMat img1_gpu, std::vector<cv::K
 std::vector<cv::DMatch> genrateMatches(cv::cuda::GpuMat des1_gpu, cv::cuda::GpuMat des2_gpu);
 
 // stitching frame and outputing GPU Mat or CV::Mat respectively
-cv::cuda::GpuMat stitchFrame_output_gpu1(
+cv::cuda::GpuMat stitchFrame_output_gpu(
     cv::cuda::GpuMat img1_gpu, cv::cuda::GpuMat img2_gpu, 
     std::vector<cv::DMatch> matches, std::vector<std::vector<cv::KeyPoint>> kps, 
-    cv::Size_<int> frame_size, int flag
+    cv::Size_<int> frame_size, int img1_col, int img2_row,  int flag
     );
 
-
-cv::cuda::GpuMat stitchFrame_output_gpu2(
-    cv::cuda::GpuMat img1_gpu, cv::cuda::GpuMat img2_gpu, 
-    std::vector<cv::DMatch> matches, std::vector<std::vector<cv::KeyPoint>> kps, 
-    cv::Size_<int> frame_size, int flag
-    );
 
 cv::Mat stitchFrame_output_cpu(
     cv::cuda::GpuMat img1_gpu, cv::cuda::GpuMat img2_gpu, 
-    std::vector<cv::DMatch> matches, std::vector<std::vector<cv::KeyPoint>> kps,
+    std::vector<cv::DMatch> matches, std::vector<std::vector<cv::KeyPoint>> kps, 
     cv::Size_<int> frame_size, int img1_col, int img2_row,  bool flag
     );
-
-//shifting image to center
-cv::cuda::GpuMat shiftFrame(cv::cuda::GpuMat img1_gpu, int x, int y);
 
 int main(int argc, char const *argv[])
 {
@@ -64,7 +54,12 @@ int main(int argc, char const *argv[])
     int compute_h32 = 0;
 
     bool running = true;
-    double prev_frame_time = 0;
+    
+    int prev_frame_time = 0;
+    int new_frame_time = 0;
+    // float fps_float = 0;
+    int fps_int = 0;
+    std::string fps_string = "";
 
     while(running){
 
@@ -95,39 +90,73 @@ int main(int argc, char const *argv[])
         Frame2_gpu.upload(Frame2);
         Frame3_gpu.upload(Frame3);
 
-        Frame2_gpu = shiftFrame(Frame2_gpu, 300 , 300);
         // genrate keypoints
         std::vector<cv::KeyPoint> kp1 = genrateKeyPoints(Frame1_gpu, {});
         std::vector<cv::KeyPoint> kp2 = genrateKeyPoints(Frame2_gpu, {});
         std::vector<cv::KeyPoint> kp3 = genrateKeyPoints(Frame3_gpu, {});
+
         // genrate descriptors
         cv::cuda::GpuMat des1 = genrateDescriptors(Frame1_gpu, kp1);
         cv::cuda::GpuMat des2 = genrateDescriptors(Frame2_gpu, kp2);
         cv::cuda::GpuMat des3 = genrateDescriptors(Frame3_gpu, kp3);
 
-        std::vector<cv::DMatch> match1 = genrateMatches(des2, des1);
-        std::vector<cv::DMatch> match2 = genrateMatches(des2, des3);
+        // matching phase 1
+        std::vector<cv::DMatch> match1 = genrateMatches(des1, des2);
 
-        cv::Size_<int> mask_size = Frame2.size() * 2;
-        cv::cuda::GpuMat leftFrame  = stitchFrame_output_gpu1(Frame2_gpu, Frame1_gpu, match1, {kp2, kp1}, mask_size, compute_h12++);
-        cv::cuda::GpuMat rightFrame  = stitchFrame_output_gpu2(Frame2_gpu, Frame3_gpu, match2, {kp2, kp3}, mask_size, compute_h32++);
+        cv::Mat displayMatches;
+        cv::drawMatches(Frame1, kp1, Frame2, kp2, match1, displayMatches);
+        // cv::imshow("goodMatches", displayMatches);
+        cv::Size_<int> pano1_size = Frame1.size() + Frame2.size();
 
-        cv::Mat leftFramecpu;
-        cv::Mat rightFramecpu;
-        leftFrame.download(leftFramecpu);
-        rightFrame.download(rightFramecpu);
-        cv::imshow("leftFrame", leftFramecpu);
-        cv::imshow("rightFrame", rightFramecpu);
-        Frame2_gpu.download(Frame2);
-        cv::Mat res;
-        cv::add(leftFramecpu, rightFramecpu, res);
-        cv::imwrite("tranfromations.png", res);
-        cv::add(res, Frame2, res);
+        // phase 1 stitching 
+        cv::cuda::GpuMat pano1 = stitchFrame_output_gpu(
+            Frame1_gpu, Frame2_gpu, match1, {kp1, kp2}, pano1_size, 
+            Frame1.cols, Frame1.rows, compute_h12++);
 
-        cv::putText(res, "FPS: " + std::to_string(static_cast<int>(1.0 / (cv::getTickCount() - prev_frame_time) * cv::getTickFrequency())), cv::Point(7, 70), cv::FONT_HERSHEY_SIMPLEX, 3, cv::Scalar(100, 255, 0), 3, cv::LINE_AA);
-        prev_frame_time = cv::getTickCount();
+        cv::Mat tranformedFrame;
+        pano1.download(tranformedFrame); 
+        // computing homography once 
 
-        cv::imshow("res", res);
+
+        // matching phase 2 
+
+        std::vector<cv::KeyPoint> pano1_kp = genrateKeyPoints(pano1, {});
+        cv::cuda::GpuMat pano_des = genrateDescriptors(pano1, pano1_kp);
+        std::vector<cv::DMatch> match2 = genrateMatches(pano_des, des3);
+
+        cv::Mat panocpu;
+        pano1.download(panocpu);
+
+        cv::Mat displayMatches1;
+        cv::drawMatches(panocpu, pano1_kp, Frame3, kp3, match2, displayMatches1);
+        cv::imshow("matches2",  displayMatches1);
+        cv::imwrite("matches2.png", displayMatches1);
+
+        cv::Mat result;
+
+        cv::Size_<int> result_size;
+        result_size.height = pano1_size.height;
+        result_size.width = pano1_size.width + Frame3.size().width;
+        result = stitchFrame_output_cpu(pano1, Frame3_gpu, match2 ,{pano1_kp, kp3}, 
+                result_size, pano1_size.width, pano1_size.height, compute_h32++); 
+
+                 
+
+        cv::putText(result, "FPS: " + std::to_string(static_cast<int>(1.0 / (cv::getTickCount() - prev_frame_time) * cv::getTickFrequency())), cv::Point(7, 70), cv::FONT_HERSHEY_SIMPLEX, 3, cv::Scalar(100, 255, 0), 3, cv::LINE_AA);
+        // display keypoints
+        // cv::imshow("kp1", displayKeypoints(Frame1, kp1));
+        // cv::imshow("kp2", displayKeypoints(Frame2, kp2));
+        // cv::imshow("kp3", displayKeypoints(Frame3, kp3));
+
+
+        // display input video feed
+        // cv::imshow("Frame1", Frame1);
+        // cv::imshow("Frame2", Frame2);
+        // cv::imshow("Frame3", Frame3);
+
+
+
+        cv::imshow("tranformedFrame", tranformedFrame);
         int key = cv::waitKey(1);
         if (key == 'q' || key == 27) {  // 'q' key or Esc key (27) to exit
             running = false;
@@ -137,18 +166,6 @@ int main(int argc, char const *argv[])
 }
 
 // function definitions
-
-
-cv::cuda::GpuMat shiftFrame(cv::cuda::GpuMat image, int x , int y){
-    cv::Mat shift = (
-        cv::Mat_<double>(3, 3) << 
-        1, 0, x,
-        0, 1, y,
-        0, 0, 1
-    );
-    cv::cuda::warpPerspective(image, image, shift, image.size() * 2);
-    return image;
-}
 
 std::vector<cv::KeyPoint> genrateKeyPoints(cv::cuda::GpuMat img1_gpu, std::vector<cv::KeyPoint> kp){
     orb_gpu->detect(img1_gpu, kp);
@@ -180,10 +197,10 @@ std::vector<cv::DMatch> genrateMatches(cv::cuda::GpuMat des1_gpu, cv::cuda::GpuM
     return good_matches;
 }
 
-cv::cuda::GpuMat stitchFrame_output_gpu2(
+cv::cuda::GpuMat stitchFrame_output_gpu(
     cv::cuda::GpuMat img1_gpu, cv::cuda::GpuMat img2_gpu, 
     std::vector<cv::DMatch> matches, std::vector<std::vector<cv::KeyPoint>> kps, 
-    cv::Size_<int> frame_size, int flag
+    cv::Size_<int> frame_size, int img1_col, int img1_row,  int flag
     ){
 
     // storing good keypoints
@@ -195,50 +212,31 @@ cv::cuda::GpuMat stitchFrame_output_gpu2(
         good_kp2.push_back(kps[1][match.trainIdx].pt);
     }
 
-    if(flag < 1){
+    if(flag < 10){
         homography1 = cv::findHomography(good_kp2, good_kp1, cv::RANSAC);
     }
-    std::cout << flag << "\n";
     //tranforming train image to a bigger mask of the tranformation matrix
 
-    cv::cuda::warpPerspective(img2_gpu, transformedFrameRight, homography1 , frame_size);
+    cv::cuda::warpPerspective(img2_gpu, transformedFrameRight, homography1, frame_size);
     cv::Mat transformedFrameRight_cpu;
 
     // extracting image from GPU to CPU
     transformedFrameRight.download(transformedFrameRight_cpu);
     cv::imwrite("tranformed_image2.png", transformedFrameRight_cpu);
+
+    cv::Mat mask = cv::Mat::zeros(frame_size, CV_8U);
+    cv::Rect region_of_intrest(0,0, img1_col, img1_row);
+    cv::Mat img1;
+    img1_gpu.download(img1);
+    img1.copyTo(mask(region_of_intrest));
+    cv::Mat TranformedFrameFrame1 = mask;
+    cv::imshow("Frame1", mask);
     //perform image addition
-    return transformedFrameRight;
-}
-cv::cuda::GpuMat stitchFrame_output_gpu1(
-    cv::cuda::GpuMat img1_gpu, cv::cuda::GpuMat img2_gpu, 
-    std::vector<cv::DMatch> matches, std::vector<std::vector<cv::KeyPoint>> kps, 
-    cv::Size_<int> frame_size, int flag
-    ){
-
-    // storing good keypoints
-    cv::cuda::GpuMat transformedFrameRight;
-    cv::cuda::GpuMat result;
-    std::vector<cv::Point2f> good_kp1, good_kp2;
-    for(auto match : matches){
-        good_kp1.push_back(kps[0][match.queryIdx].pt);
-        good_kp2.push_back(kps[1][match.trainIdx].pt);
-    }
-
-    if(flag <= 133){
-        homography2 = cv::findHomography(good_kp2, good_kp1, cv::RANSAC);
-    }
-    std::cout << flag << "\n";
-    //tranforming train image to a bigger mask of the tranformation matrix
-
-    cv::cuda::warpPerspective(img2_gpu, transformedFrameRight, homography2 , frame_size);
-    cv::Mat transformedFrameRight_cpu;
-
-    // extracting image from GPU to CPU
-    transformedFrameRight.download(transformedFrameRight_cpu);
-    cv::imwrite("tranformed_image2.png", transformedFrameRight_cpu);
-    //perform image addition
-    return transformedFrameRight;
+    cv::imwrite("TranformedFrameRight.png",TranformedFrameFrame1);
+    cv::Mat result_cpu;
+    cv::add(TranformedFrameFrame1, transformedFrameRight_cpu, result_cpu);
+    result.upload(result_cpu);
+    return result;
 }
 
 cv::Mat stitchFrame_output_cpu(
@@ -255,7 +253,7 @@ cv::Mat stitchFrame_output_cpu(
             good_kp2.push_back(kps[1][match.trainIdx].pt);
         }
 
-        if(flag < 10){
+        if(flag < 1){
             homography2 = cv::findHomography(good_kp2, good_kp1, cv::RANSAC);
         }
         //tranforming train image to a bigger mask of the tranformation matrix
@@ -279,3 +277,4 @@ cv::Mat stitchFrame_output_cpu(
         cv::add(TranformedFrameFrame1, transformedFrameRight_cpu, result_cpu);
         return result_cpu;
     }
+    
