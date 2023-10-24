@@ -3,16 +3,16 @@
 #include<opencv4/opencv2/features2d.hpp>
 
 //globlal declaration
-cv::Ptr<cv::SIFT> orb = cv::SIFT::create();
+cv::Ptr<cv::SIFT> sift = cv::SIFT::create();
 
 std::vector<cv::KeyPoint> genrateKeyPoints(cv::Mat frame, std::vector<cv::KeyPoint> keypoints){
-    orb->detect(frame, keypoints);
+    sift->detect(frame, keypoints);
     return keypoints;
 }
 
 cv::Mat genrateDescriptors(cv::Mat frame, std::vector<cv::KeyPoint> keypoints){
     cv::Mat descriptor;
-    orb->compute(frame, keypoints, descriptor);
+    sift->compute(frame, keypoints, descriptor);
     return descriptor;
 }
 
@@ -29,6 +29,8 @@ cv::Mat shiftImage(cv::Mat image, int x , int y){
 
 std::vector<cv::DMatch> LowesRatioClean(std::vector<std::vector<cv::DMatch>> rawmatches){
     std::vector<cv::DMatch> goodMatches;
+
+    
     double ratio = 0.8;
     for(auto match : rawmatches){
         // std::cout << match[0].distance << " " << match[1].distance << "\n";
@@ -41,18 +43,28 @@ std::vector<cv::DMatch> LowesRatioClean(std::vector<std::vector<cv::DMatch>> raw
 
 int main(int argc, char const *argv[])
 {
-    cv::VideoCapture video1("videos/output6.mkv");
-    cv::VideoCapture video2("videos/output2.mkv");
-    cv::VideoCapture video3("videos/output4.mkv");
+    cv::VideoCapture video1("videos/video_sample2/left.mp4");
+    cv::VideoCapture video2("videos/video_sample2/middle.mp4");
+    cv::VideoCapture video3("videos/video_sample2/right.mp4");
 
     cv::Mat Frame1;
     cv::Mat Frame2;
     cv::Mat Frame3;
 
+    cv::Mat Tranformation21;
+    cv::Mat Tranformation23;
+
     bool isHomographyComputed21 = false;
     bool isHomographyComputed23 = false;
     bool isShifted = false;
-    int prev_frame_time = 0;
+
+    clock_t start, end;
+    double time_s;
+    int frame_count = 0;
+
+    // start clock
+
+    start = clock();
     while(video1.isOpened() && video2.isOpened() && video3.isOpened()){
         bool isFrame1Active = video1.read(Frame1);
         bool isFrame2Active = video2.read(Frame2);
@@ -61,6 +73,10 @@ int main(int argc, char const *argv[])
         cv::imwrite("output_images/input/img1.png", Frame1);
         cv::imwrite("output_images/input/img2.png", Frame2);
         cv::imwrite("output_images/input/img3.png", Frame3);
+        // converting frame to grayscale
+        // cv::cvtColor(Frame1, Frame1, cv::COLOR_BGR2GRAY);
+        // cv::cvtColor(Frame2, Frame2, cv::COLOR_BGR2GRAY);
+        // cv::cvtColor(Frame3, Frame3, cv::COLOR_BGR2GRAY);
 
         // shifing the reference image to the center
 
@@ -124,7 +140,7 @@ int main(int argc, char const *argv[])
         cv::drawMatches(Frame2, kp_vid2, Frame3, kp_vid3, goodMatches23, goodMatches23_display);
         cv::imwrite("output_images/matching/goodMatches21.png", goodMatches21_display);
         cv::imwrite("output_images/matching/goodMatches23.png", goodMatches23_display);
-        cv::imshow("matches 23", goodMatches21_display);
+        // cv::imshow("matches 23", goodMatches21_display);
         std::vector<cv::Point2f> good_kp12, good_kp21, good_kp32, good_kp23;
         for(auto match23 : goodMatches23){
             good_kp32.push_back(kp_vid2[match23.queryIdx].pt);
@@ -136,7 +152,6 @@ int main(int argc, char const *argv[])
             good_kp12.push_back(kp_vid1[match21.trainIdx].pt);
         }
 
-        cv::Mat Tranformation23;
         if(!isHomographyComputed23){
             cv::Mat Homography23 = cv::findHomography(good_kp23, good_kp32, cv::RANSAC);
             cv::warpPerspective(Frame3, Tranformation23, Homography23, Frame2.size());
@@ -144,7 +159,6 @@ int main(int argc, char const *argv[])
             isHomographyComputed23 = true;
         }
 
-        cv::Mat Tranformation21;
         if(!isHomographyComputed21){
             cv::Mat Homography21 = cv::findHomography(good_kp12, good_kp21, cv::RANSAC);
             cv::warpPerspective(Frame1, Tranformation21, Homography21, Frame2.size());
@@ -171,16 +185,28 @@ int main(int argc, char const *argv[])
         // cv::imshow("Video3", Frame3);
 
         // panormoic result
-
+        frame_count++; 
+        
         cv::Mat temp_res, result;
-        std::cout << "hello\n";
         cv::add(Tranformation21, Frame2, temp_res);
         cv::add(temp_res, Tranformation23, result);
+        end = clock();
+        time_s = ((double) (end - start) / CLOCKS_PER_SEC);
+        // cv::putText(res,
+        //             "FPS: " + std::to_string(static_cast<int>(
+        //                           1.0 / (cv::getTickCount() - prev_frame_time) *
+        //                           cv::getTickFrequency())),
+        //             cv::Point(7, 70), cv::FONT_HERSHEY_SIMPLEX, 3,
+        //             cv::Scalar(100, 255, 0), 3, cv::LINE_AA);
+        if(time_s >= 1.0){
+            double fps = (double) (frame_count) / time_s;
+            std::cout << fps << "\n";
+            cv::putText(result,
+                        "FPS: " + std::to_string(fps),
+                        cv::Point(7, 70), cv::FONT_HERSHEY_SIMPLEX, 3,
+                        cv::Scalar(100, 255, 0), 3, cv::LINE_AA);
+        }
         cv::imshow("result", result);
-        cv::imwrite("result.png", result);
-        cv::putText(result, "FPS: " + std::to_string(static_cast<int>(1.0 / (cv::getTickCount() - prev_frame_time) * cv::getTickFrequency())), cv::Point(7, 70), cv::FONT_HERSHEY_SIMPLEX, 3, cv::Scalar(100, 255, 0), 3, cv::LINE_AA);
-        prev_frame_time = cv::getTickCount();
-
         int key = cv::waitKey(100);
         if (key == 'q' || key == 27) {  // 'q' key or Esc key (27) to exit
             break;
