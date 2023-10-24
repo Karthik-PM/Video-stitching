@@ -5,12 +5,15 @@
 #include <opencv2/opencv.hpp>
 #include <opencv2/stitching/detail/warpers.hpp>
 #include <time.h>
+
 // global declarations
 cv::Ptr<cv::cuda::ORB> orb_gpu = cv::cuda::ORB::create();
 cv::Ptr<cv::cuda::DescriptorMatcher> matcher =
     cv::cuda::DescriptorMatcher::createBFMatcher(cv::NORM_HAMMING);
+
 cv::Mat homography1;
 cv::Mat homography2;
+
 // function declations
 
 // keypoint detection
@@ -110,15 +113,19 @@ int main(int argc, char const *argv[]) {
     cv::cvtColor(Frame2, Frame2, cv::COLOR_BGR2GRAY);
     cv::cvtColor(Frame3, Frame3, cv::COLOR_BGR2GRAY);
 
+    // upload frames to GPU
     Frame1_gpu.upload(Frame1);
     Frame2_gpu.upload(Frame2);
     Frame3_gpu.upload(Frame3);
 
+    // shift middle frame by 300 units x and y axis
     Frame2_gpu = shiftFrame(Frame2_gpu, 300, 300);
+
     // genrate keypoints
     std::vector<cv::KeyPoint> kp1 = genrateKeyPoints(Frame1_gpu, {});
     std::vector<cv::KeyPoint> kp2 = genrateKeyPoints(Frame2_gpu, {});
     std::vector<cv::KeyPoint> kp3 = genrateKeyPoints(Frame3_gpu, {});
+
     // genrate descriptors
     cv::cuda::GpuMat des1 = genrateDescriptors(Frame1_gpu, kp1);
     cv::cuda::GpuMat des2 = genrateDescriptors(Frame2_gpu, kp2);
@@ -128,35 +135,45 @@ int main(int argc, char const *argv[]) {
     std::vector<cv::DMatch> match2 = genrateMatches(des2, des3);
 
     cv::Size_<int> mask_size = Frame2.size() * 2;
+
+    // stitch Frame 1 and Frame 2
     cv::cuda::GpuMat leftFrame = stitchFrame_output_gpu1(
         Frame2_gpu, Frame1_gpu, match1, {kp2, kp1}, mask_size, compute_h12++);
+
+    // stitch Frame 2 and Frame 2
     cv::cuda::GpuMat rightFrame = stitchFrame_output_gpu2(
         Frame2_gpu, Frame3_gpu, match2, {kp2, kp3}, mask_size, compute_h32++);
 
     cv::Mat leftFramecpu;
     cv::Mat rightFramecpu;
+
+    // dowloading warpped results to CPU
     leftFrame.download(leftFramecpu);
     rightFrame.download(rightFramecpu);
+
     // cv::imshow("leftFrame", leftFramecpu);
     // cv::imshow("rightFrame", rightFramecpu);
     Frame2_gpu.download(Frame2);
+
     cv::Mat res;
     cv::add(leftFramecpu, rightFramecpu, res);
-
     cv::imwrite("tranfromations.png", res);
+
+    // adding the tranformed images and genrating results
     cv::add(res, Frame2, res);
+
+    // frame count 
     frame_count ++;
+
+    // cropping the result from the big mask
     cv::Rect ROI(0, 300, mask_size.width - 200, 500);
     res = res(ROI);
 
+    // end time
     end = clock();
     time_s = ((double) (end - start) / CLOCKS_PER_SEC);
-    // cv::putText(res,
-    //             "FPS: " + std::to_string(static_cast<int>(
-    //                           1.0 / (cv::getTickCount() - prev_frame_time) *
-    //                           cv::getTickFrequency())),
-    //             cv::Point(7, 70), cv::FONT_HERSHEY_SIMPLEX, 3,
-    //             cv::Scalar(100, 255, 0), 3, cv::LINE_AA);
+
+    // frame rate estimation
     if(time_s >= 1.0){
         double fps = static_cast<double> (frame_count) / time_s;
         cv::putText(res,
@@ -165,8 +182,9 @@ int main(int argc, char const *argv[]) {
                     cv::Scalar(100, 255, 0), 3, cv::LINE_AA);
     }
 
-
+    // display result
     cv::imshow("res", res);
+
     if(compute_h12 >= 12){
       writer.write(res);
     }
@@ -178,6 +196,7 @@ int main(int argc, char const *argv[]) {
   cap1.release();
   cap2.release();
   cap3.release();
+
   writer.release();
   return 0;
 }
@@ -233,6 +252,7 @@ stitchFrame_output_gpu2(cv::cuda::GpuMat img1_gpu, cv::cuda::GpuMat img2_gpu,
   // storing good keypoints
   cv::cuda::GpuMat transformedFrameRight;
   cv::cuda::GpuMat result;
+
   std::vector<cv::Point2f> good_kp1, good_kp2;
   for (auto match : matches) {
     good_kp1.push_back(kps[0][match.queryIdx].pt);
@@ -255,6 +275,7 @@ stitchFrame_output_gpu2(cv::cuda::GpuMat img1_gpu, cv::cuda::GpuMat img2_gpu,
   // perform image addition
   return transformedFrameRight;
 }
+
 cv::cuda::GpuMat
 stitchFrame_output_gpu1(cv::cuda::GpuMat img1_gpu, cv::cuda::GpuMat img2_gpu,
                         std::vector<cv::DMatch> matches,
