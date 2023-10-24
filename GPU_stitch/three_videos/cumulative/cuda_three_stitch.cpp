@@ -278,7 +278,7 @@ cv::Mat stitchFrame_output_cpu(cv::cuda::GpuMat img1_gpu,
   img1_gpu.download(img1);
   img1.copyTo(mask(region_of_intrest));
   cv::Mat TranformedFrameFrame1 = mask;
-  cv::imshow("Frame1", mask);
+  // cv::imshow("Frame1", mask);
   // perform image addition
   cv::Mat result_cpu;
   cv::add(TranformedFrameFrame1, transformedFrameRight_cpu, result_cpu);

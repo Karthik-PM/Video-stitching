@@ -3,7 +3,8 @@
 #include <opencv2/cudaimgproc.hpp>
 #include <opencv2/cudawarping.hpp>
 #include <opencv2/opencv.hpp>
-
+#include <opencv2/stitching/detail/warpers.hpp>
+#include <time.h>
 // global declarations
 cv::Ptr<cv::cuda::ORB> orb_gpu = cv::cuda::ORB::create();
 cv::Ptr<cv::cuda::DescriptorMatcher> matcher =
@@ -69,6 +70,21 @@ int main(int argc, char const *argv[]) {
   bool running = true;
   double prev_frame_time = 0;
 
+  // recording output
+  cv::VideoWriter writer;
+  int codec = cv::VideoWriter::fourcc('M', 'P', '4', 'V');
+  std::string fileName = "three_stitch.mp4";
+  cv::Size frameOutput(1080, 500);
+  double fps = 55.0;
+  writer.open(fileName, codec, fps, frameOutput, false);
+
+  clock_t start, end;
+  double time_s;
+  int frame_count = 0;
+
+  // start clock
+
+  start = clock();
   while (running) {
 
     bool isFrame1Active = cap1.read(Frame1);
@@ -76,18 +92,18 @@ int main(int argc, char const *argv[]) {
     bool isFrame3Active = cap3.read(Frame3);
 
     // loop back video
-    if (!isFrame1Active) {
-      cap1.set(cv::CAP_PROP_POS_FRAMES, 0);
-      continue;
-    }
-    if (!isFrame2Active) {
-      cap2.set(cv::CAP_PROP_POS_FRAMES, 0);
-      continue;
-    }
-    if (!isFrame3Active) {
-      cap3.set(cv::CAP_PROP_POS_FRAMES, 0);
-      continue;
-    }
+    // if (!isFrame1Active) {
+    //   cap1.set(cv::CAP_PROP_POS_FRAMES, 0);
+    //   continue;
+    // }
+    // if (!isFrame2Active) {
+    //   cap2.set(cv::CAP_PROP_POS_FRAMES, 0);
+    //   continue;
+    // }
+    // if (!isFrame3Active) {
+    //   cap3.set(cv::CAP_PROP_POS_FRAMES, 0);
+    //   continue;
+    // }
 
     // converting frame to grayscale
     cv::cvtColor(Frame1, Frame1, cv::COLOR_BGR2GRAY);
@@ -126,23 +142,43 @@ int main(int argc, char const *argv[]) {
     Frame2_gpu.download(Frame2);
     cv::Mat res;
     cv::add(leftFramecpu, rightFramecpu, res);
+
     cv::imwrite("tranfromations.png", res);
     cv::add(res, Frame2, res);
+    frame_count ++;
+    cv::Rect ROI(0, 300, mask_size.width - 200, 500);
+    res = res(ROI);
 
-    cv::putText(res,
-                "FPS: " + std::to_string(static_cast<int>(
-                              1.0 / (cv::getTickCount() - prev_frame_time) *
-                              cv::getTickFrequency())),
-                cv::Point(7, 70), cv::FONT_HERSHEY_SIMPLEX, 3,
-                cv::Scalar(100, 255, 0), 3, cv::LINE_AA);
-    prev_frame_time = cv::getTickCount();
+    end = clock();
+    time_s = ((double) (end - start) / CLOCKS_PER_SEC);
+    // cv::putText(res,
+    //             "FPS: " + std::to_string(static_cast<int>(
+    //                           1.0 / (cv::getTickCount() - prev_frame_time) *
+    //                           cv::getTickFrequency())),
+    //             cv::Point(7, 70), cv::FONT_HERSHEY_SIMPLEX, 3,
+    //             cv::Scalar(100, 255, 0), 3, cv::LINE_AA);
+    if(time_s >= 1.0){
+        double fps = static_cast<double> (frame_count) / time_s;
+        cv::putText(res,
+                    "FPS: " + std::to_string(static_cast<int> (fps)),
+                    cv::Point(7, 70), cv::FONT_HERSHEY_SIMPLEX, 3,
+                    cv::Scalar(100, 255, 0), 3, cv::LINE_AA);
+    }
+
 
     cv::imshow("res", res);
+    if(compute_h12 >= 12){
+      writer.write(res);
+    }
     int key = cv::waitKey(1);
     if (key == 'q' || key == 27) { // 'q' key or Esc key (27) to exit
       running = false;
     }
   }
+  cap1.release();
+  cap2.release();
+  cap3.release();
+  writer.release();
   return 0;
 }
 
@@ -234,14 +270,15 @@ stitchFrame_output_gpu1(cv::cuda::GpuMat img1_gpu, cv::cuda::GpuMat img2_gpu,
     good_kp2.push_back(kps[1][match.trainIdx].pt);
   }
 
-  if (flag <= 84) {
+  if (flag <= 12) {
     homography2 = cv::findHomography(good_kp2, good_kp1, cv::RANSAC);
   }
-  std::cout << flag << "\n";
+  // std::cout << flag << "\n";
   // tranforming train image to a bigger mask of the tranformation matrix
 
   cv::cuda::warpPerspective(img2_gpu, transformedFrameRight, homography2,
                             frame_size);
+
   cv::Mat transformedFrameRight_cpu;
 
   // extracting image from GPU to CPU
@@ -261,6 +298,7 @@ cv::Mat stitchFrame_output_cpu(cv::cuda::GpuMat img1_gpu,
   cv::cuda::GpuMat transformedFrameRight;
   cv::cuda::GpuMat result;
   std::vector<cv::Point2f> good_kp1, good_kp2;
+
   for (auto match : matches) {
     good_kp1.push_back(kps[0][match.queryIdx].pt);
     good_kp2.push_back(kps[1][match.trainIdx].pt);
@@ -285,8 +323,10 @@ cv::Mat stitchFrame_output_cpu(cv::cuda::GpuMat img1_gpu,
   img1.copyTo(mask(region_of_intrest));
   cv::Mat TranformedFrameFrame1 = mask;
   cv::imshow("Frame1", mask);
+
   // perform image addition
   cv::Mat result_cpu;
   cv::add(TranformedFrameFrame1, transformedFrameRight_cpu, result_cpu);
   return result_cpu;
+
 }
